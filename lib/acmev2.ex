@@ -530,9 +530,12 @@ defmodule Acmev2 do
     File.mkdir_p!(Path.dirname(path))
     File.write(path, gen_key_authorization(token))
 
+    port = Application.get_env(:zerossl, :port, 80)
+    {:ok, bind_address} = Application.get_env(:zerossl, :addr, "0.0.0.0") |> String.to_charlist() |> :inet.parse_address()
     {:ok, pid} =
       :inets.start(:httpd,
-        port: 80,
+        port: port,
+        bind_address: bind_address,
         server_name: ~c"httpd_test",
         server_root: ~c"./",
         document_root: ~c"./"

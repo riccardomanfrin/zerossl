@@ -27,7 +27,7 @@ config  :zerossl,
   user_email:  "myfancy-email@gmail.com",
   cert_domain:  "myfancy-domain.com",
   certfile:  "./cert.pem",
-  keyfile:  "./key.pem",
+  keyfile:  "./key.pem"
 ```
 where
 * `user_email` is the email used to register your account on Zerossl;
@@ -37,6 +37,8 @@ where
 Note that key and certificate are always stored on FS to reduce the number of interrogations of Zerossl servers when the service is rebooted.
 
 ### Additional optional config
+* `port`, optional listening port for serving the well-known secret token. If omitted, defaulted to port 80
+* `addr`, optinal listenening ip address for serving well-known secret token. If omitted defaulted to any addr `0.0.0.0`
 * `selfsigned` [default: false]: forces "dryrun" selfsigned certificate generation without zerossl exchanges.
 * `update_handler` [default: nil]: permits to specify a module that implements the `Zerossl.UpdateHandler` behavior to get notifications when the certificate is renewed. This can be used as trigger to reload a listening HTTPs server with the new certificate/key. The handler is always invoked upon start of the process: subordinating the start of the HTTPs server to the call by this handler is legitimate.
 * `access_key`: **This is at the moment not used** unless for special operations like [getting EAB credentials](https://zerossl.com/documentation/acme/generate-eab-credentials/) without email. Since the same operation is atm carried out through the account email, currently I have no use of this attribute nor I have found what is the benefit of using it in place of the `user_email`.

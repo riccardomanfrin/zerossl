@@ -6,6 +6,8 @@ config :zerossl,
   cert_domain: "myfancy-domain.com",
   certfile: "./cert.pem",
   keyfile: "./key.pem",
-  update_handler: nil
+  update_handler: nil,
+  port: 80,
+  addr: "0.0.0.0"
 
 import_config "#{config_env()}.exs"
