@@ -310,7 +310,7 @@ defmodule Acmev2 do
     #    "y" => "XLLRQyuhBlY4x3irkxXpW7rlvnN8DMZ1IAHRDq9RJVA"
     #  },
     #  "nonce" => "i086WxMCU7f0EFNoNyeQ0qgqJ3nl0k-pPv_bBqM-R5E",
-    #  "url" => "https://acme.zerossl.com/v2/DV90/newAccount"
+    #  "url" => "#{@uri}/newAccount"
     # }
     # payload
     # %{
@@ -336,7 +336,7 @@ defmodule Acmev2 do
     # %{
     #  "alg" => "HS256",
     #  "kid" => "lpsiTvsUUaX3L3Sfb4PTWQ",
-    #  "url" => "https://acme.zerossl.com/v2/DV90/newAccount"
+    #  "url" => "#{@uri}/newAccount"
     # }
     payload_payload =
       calcjwk()
