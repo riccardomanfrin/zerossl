@@ -26,9 +26,8 @@ defmodule Acmev2 do
 
   # @ecdsa_with_SHA256 {1, 2, 840, 10045, 4, 3, 2}
 
-  @path "/v2/DV90"
-  @host "acme.zerossl.com"
-  @uri "https://#{@host}#{@path}"
+  @acme_uri "https://acme.zerossl.com/v2/DV90"
+  # @acme_uri "https://acme-v02.api.letsencrypt.org/directory"
 
   @doc """
   Print a certificate content
@@ -173,43 +172,23 @@ defmodule Acmev2 do
   @doc """
   Retrieve EAB credentials from access key instead than from email credentials
   """
-  @spec get_eab_credentials(ops :: list(), nonce :: binary(), access_key :: binary()) ::
+  @spec get_eab_credentials(account_key :: binary()) ::
           {binary(), term() | no_return()}
-  def get_eab_credentials(ops, nonce, access_key) do
+  defp get_eab_credentials(account_key) do
     case File.read("eab_credentials.json") do
       {:ok, bin} ->
-        {nonce, jdec(bin)}
+        jdec(bin)
 
       _ ->
         {:ok, %HTTPoison.Response{body: bin}} =
           post(
-            "https://api.zerossl.com/acme/eab-credentials?access_key=#{access_key}",
+            "https://api.zerossl.com/acme/eab-credentials?access_key=#{account_key}",
             "",
             []
           )
 
-        eab_credentials = jdec(bin)
-
-        {new_nonce, _account_location, new_accountRes} =
-          post_new_account(ops, nonce, eab_credentials)
-
-        %{
-          externalAccountBinding: %{
-            payload: res_payload,
-            protected: res_protected
-          }
-        } =
-          new_accountRes
-          |> jdec()
-
-        res_payload
-        |> dec()
-
-        res_protected
-        |> dec()
-
         File.write("eab_credentials.json", bin)
-        {new_nonce, Jason.decode!(bin, keys: :atoms)}
+        jdec(bin)
     end
 
     # {nonce,
@@ -260,7 +239,7 @@ defmodule Acmev2 do
   end
 
   defp get_operations() do
-    {:ok, res} = get(@uri)
+    {:ok, res} = get(@acme_uri)
     if res.status_code != 200, do: raise("Cannot get operations")
 
     jdec(res.body)
@@ -310,7 +289,7 @@ defmodule Acmev2 do
     #    "y" => "XLLRQyuhBlY4x3irkxXpW7rlvnN8DMZ1IAHRDq9RJVA"
     #  },
     #  "nonce" => "i086WxMCU7f0EFNoNyeQ0qgqJ3nl0k-pPv_bBqM-R5E",
-    #  "url" => "#{@uri}/newAccount"
+    #  "url" => "#{@acme_uri}/newAccount"
     # }
     # payload
     # %{
@@ -336,7 +315,7 @@ defmodule Acmev2 do
     # %{
     #  "alg" => "HS256",
     #  "kid" => "lpsiTvsUUaX3L3Sfb4PTWQ",
-    #  "url" => "#{@uri}/newAccount"
+    #  "url" => "#{@acme_uri}/newAccount"
     # }
     payload_payload =
       calcjwk()
@@ -531,7 +510,12 @@ defmodule Acmev2 do
     File.write(path, gen_key_authorization(token))
 
     port = Application.get_env(:zerossl, :port, 80)
-    {:ok, bind_address} = Application.get_env(:zerossl, :addr, "0.0.0.0") |> String.to_charlist() |> :inet.parse_address()
+
+    {:ok, bind_address} =
+      Application.get_env(:zerossl, :addr, "0.0.0.0")
+      |> String.to_charlist()
+      |> :inet.parse_address()
+
     {:ok, pid} =
       :inets.start(:httpd,
         port: port,
@@ -693,17 +677,29 @@ defmodule Acmev2 do
   directly written on a file
   """
 
-  @spec gen_cert(user_email :: binary(), domain :: binary()) ::
+  @spec gen_cert_from_account_key(account_key :: binary(), domain :: binary()) ::
           {key :: binary(), cert :: binary()}
-  def gen_cert(user_email, domain) do
-    Logger.debug("Generating cert for user #{user_email}, domain #{domain}")
+  def gen_cert_from_account_key(account_key, domain) do
+    Logger.debug("Get EAB credentials")
+
+    get_eab_credentials(account_key)
+    |> gen_cert(domain)
+  end
+
+  @spec gen_cert_from_email(user_email :: binary(), domain :: binary()) ::
+          {key :: binary(), cert :: binary()}
+  def gen_cert_from_email(user_email, domain) do
+    Logger.debug("Get EAB credentials")
+
+    get_eab_credentials_byemail(user_email)
+    |> gen_cert(domain)
+  end
+
+  defp gen_cert(eab_credentials, domain) do
+    Logger.debug("Generating cert for domain #{domain}")
 
     Logger.debug("Get operations")
     ops = get_operations()
-
-    Logger.debug("Get EAB credentials")
-    # eab_credentials = get_eab_credentials(ops, nonce, access_key)
-    eab_credentials = get_eab_credentials_byemail(user_email)
 
     Logger.debug("Get nonce")
     nonce = get_new_nonce(ops)
@@ -714,7 +710,6 @@ defmodule Acmev2 do
     Logger.debug("Get new account")
     {nonce, account_location, _new_account_res} = post_new_account(ops, nonce, eab_credentials)
 
-    ## {nonce, eab_credentials} = Zerossl.get_eab_credentials(ops, nonce, access_key)
     Logger.debug("Get new order")
     {nonce, new_order_res} = post_new_order(ops, domain, account_location, nonce, eab_credentials)
 

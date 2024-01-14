@@ -108,8 +108,8 @@ defmodule Certmgr do
   end
 
   defp renew_certificate() do
-    # access_key = Application.get_env(:zerossl, :access_key)
     user_email = Application.get_env(:zerossl, :user_email)
+    account_key = Application.get_env(:zerossl, :account_key)
     domain = Application.get_env(:zerossl, :cert_domain)
 
     Logger.debug("Renewing certificate now!")
@@ -117,8 +117,13 @@ defmodule Certmgr do
     {cert_priv_key, public_cert} =
       case Application.get_env(:zerossl, :selfsigned, false) do
         true -> Selfsigned.gen_cert(domain)
-        false -> Acmev2.gen_cert(user_email, domain)
-      end
+        false ->
+          case user_email do
+            nil -> Acmev2.gen_cert_from_account_key(account_key, domain)
+              _ -> Acmev2.gen_cert_from_email(user_email, domain)
+
+          end
+        end
 
     write_cert(cert_priv_key, public_cert)
     notify_update_handler(cert_priv_key, public_cert)
