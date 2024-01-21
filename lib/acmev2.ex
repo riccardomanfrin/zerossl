@@ -26,8 +26,9 @@ defmodule Acmev2 do
 
   # @ecdsa_with_SHA256 {1, 2, 840, 10045, 4, 3, 2}
 
-  @acme_uri "https://acme.zerossl.com/v2/DV90"
-  # @acme_uri "https://acme-v02.api.letsencrypt.org/directory"
+  @letsencrypt "https://acme-staging-v02.api.letsencrypt.org/directory"
+  @zerossl "https://acme.zerossl.com/v2/DV90"
+  @acme_uri @letsencrypt
 
   @doc """
   Print a certificate content
@@ -40,19 +41,22 @@ defmodule Acmev2 do
     end
   end
 
-  # defp jwk_dec(data) do
-  #  %{
-  #    payload: payload,
-  #    protected: protected,
-  #    signature: signature
-  #  } = jdec(data)
-  #
-  #  %{
-  #    payload: dec(payload),
-  #    protected: dec(protected),
-  #    signature: signature
-  #  }
-  # end
+  @doc """
+  Print a JWS content
+  """
+  def jws_dec(data) do
+    %{
+      payload: payload,
+      protected: protected,
+      signature: signature
+    } = jdec(data)
+
+    %{
+      payload: dec(payload),
+      protected: dec(protected),
+      signature: signature
+    }
+  end
 
   defp dec(""), do: ""
 
@@ -277,7 +281,6 @@ defmodule Acmev2 do
     #  "payload": "eyJjb250YWN0IjogWyJtYWlsdG86cmljY2FyZG9tYW5mcmluQGdtYWlsLmNvbSJdLCAidGVybXNPZlNlcnZpY2VBZ3JlZWQiOiB0cnVlLCJleHRlcm5hbEFjY291bnRCaW5kaW5nIjp7InByb3RlY3RlZCI6ImV5SmhiR2NpT2lKSVV6STFOaUlzSW10cFpDSTZJbXh3YzJsVWRuTlZWV0ZZTTB3elUyWmlORkJVVjFFaUxDSjFjbXdpT2lKb2RIUndjem92TDJGamJXVXVlbVZ5YjNOemJDNWpiMjB2ZGpJdlJGWTVNQzl1WlhkQlkyTnZkVzUwSW4wIiwgInBheWxvYWQiOiJleUpqY25ZaU9pQWlVQzB5TlRZaUxDQWlhM1I1SWpvZ0lrVkRJaXdnSW5naU9pQWliVlEwWlRWRGNGQmhlRU5NTTA5dWFYWjJiVWs0VWt4a1FXY3pabDlFZGtGdlptbGlUMGsyY0VGdE1DSXNJQ0o1SWpvZ0lsaE1URkpSZVhWb1FteFpOSGd6YVhKcmVGaHdWemR5YkhadVRqaEVUVm94U1VGSVVrUnhPVkpLVmtFaWZRIiwgInNpZ25hdHVyZSI6InpacVNMMW5FSm5tb3FRcER1VHlNVkJIM0xtbDFkZVl4U2hsSEFqbVh6azgifX0",
     #  "signature": "CDtBv2b_Wkh8P39MqqSE_A-gWFXbbOlS81UGxKkrGqI4ImNDOvwpqRJUIkcUZgkihbLpzhqbkLJfNkwL6aeu6A"
     # }
-
     # packet2
     # protected
     # %{
@@ -317,35 +320,45 @@ defmodule Acmev2 do
     #  "kid" => "lpsiTvsUUaX3L3Sfb4PTWQ",
     #  "url" => "#{@acme_uri}/newAccount"
     # }
-    payload_payload =
-      calcjwk()
-      |> enc()
-
-    payload_protected =
-      %{
-        "alg" => "HS256",
-        "kid" => eab_credentials[:eab_kid],
-        "url" => ops[:newAccount]
-      }
-      |> enc()
-
-    hmac_key = eab_credentials[:eab_hmac_key] |> Base.url_decode64!(padding: false)
-    sign_input = "#{payload_protected}.#{payload_payload}"
-
-    hmac_signature =
-      :crypto.mac(:hmac, :sha256, hmac_key, sign_input)
-      |> benc()
 
     payload =
       %{
         "contact" => ["mailto:riccardomanfrin@gmail.com"],
-        "externalAccountBinding" => %{
-          "payload" => payload_payload,
-          "protected" => payload_protected,
-          "signature" => hmac_signature
-        },
         "termsOfServiceAgreed" => true
       }
+
+    payload =
+      case @acme_uri == @letsencrypt do
+        true ->
+          payload
+
+        false ->
+          payload_payload =
+            calcjwk()
+            |> enc()
+
+          payload_protected =
+            %{
+              "alg" => "HS256",
+              "kid" => eab_credentials[:eab_kid],
+              "url" => ops[:newAccount]
+            }
+            |> enc()
+
+          hmac_key = eab_credentials[:eab_hmac_key] |> Base.url_decode64!(padding: false)
+          sign_input = "#{payload_protected}.#{payload_payload}"
+
+          hmac_signature =
+            :crypto.mac(:hmac, :sha256, hmac_key, sign_input)
+            |> benc()
+
+          payload
+          |> Map.put("externalAccountBinding", %{
+            "payload" => payload_payload,
+            "protected" => payload_protected,
+            "signature" => hmac_signature
+          })
+      end
       |> enc()
 
     protected =
@@ -364,6 +377,8 @@ defmodule Acmev2 do
         "signature" => es256sign("#{protected}.#{payload}")
       }
       |> jenc()
+
+    IO.inspect(jws_dec(body))
 
     {:ok, %HTTPoison.Response{body: bin} = new_account_res} =
       post(ops[:newAccount], body, "Content-Type": "application/jose+json")
