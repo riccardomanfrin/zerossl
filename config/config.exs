@@ -1,6 +1,7 @@
 import Config
 
 config :zerossl,
+  provider: :zerossl,
   user_email: "myfancy-email@gmail.com",
   account_key: "99999999999999999999999999999999",
   cert_domain: "myfancy-domain.com",

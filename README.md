@@ -24,12 +24,14 @@ In your `config.exs` or `prod.exs` add the following config:
 
 ```elixir
 config  :zerossl,
+  provider: :zerossl
   user_email:  "myfancy-email@gmail.com",
   cert_domain:  "myfancy-domain.com",
   certfile:  "./cert.pem",
   keyfile:  "./key.pem"
 ```
 where
+* `provider` is `:zerossl` (default), `:letsenctypt` or `:letsencrypt_test`
 * `user_email` is the email used to register your account on Zerossl;
 * `cert_domain` is the domain that resolves your software application project, and for which you want to issue the certificate
 * `certfile` and `keyfile` are the places where you want to store your certificate and key respectively.
@@ -41,5 +43,6 @@ Note that key and certificate are always stored on FS to reduce the number of in
 * `addr`, optinal listenening ip address for serving well-known secret token. If omitted defaulted to any addr `0.0.0.0`
 * `selfsigned` [default: false]: forces "dryrun" selfsigned certificate generation without zerossl exchanges.
 * `update_handler` [default: nil]: permits to specify a module that implements the `Zerossl.UpdateHandler` behavior to get notifications when the certificate is renewed. This can be used as trigger to reload a listening HTTPs server with the new certificate/key. The handler is always invoked upon start of the process: subordinating the start of the HTTPs server to the call by this handler is legitimate.
-* `account_key`: It is possible to use the account key in place of the user email for Zerossl to retrieve EAB credentials [getting EAB credentials](https://zerossl.com/documentation/acme/generate-eab-credentials/). I have not found why using one or the other would be better.
+* `account_key`: It is possible to use the account key in place of the user email for Zerossl to retrieve EAB credentials [getting EAB credentials](https://zerossl.com/documentation/acme/generate-eab-credentials/). I have not found why using one or the other would be better. For letsencrypt leave this empty as the account key is forged along the process, since letsenctypt
+doesn't require the `externalAccountBinding`.
 

@@ -26,10 +26,15 @@ defmodule Acmev2 do
 
   # @ecdsa_with_SHA256 {1, 2, 840, 10045, 4, 3, 2}
 
-  @letsencrypt "https://acme-staging-v02.api.letsencrypt.org/directory"
-  @zerossl "https://acme.zerossl.com/v2/DV90"
-  #@acme_uri @letsencrypt
-  @acme_uri @zerossl
+  @provider_api %{
+    zerossl: "https://acme.zerossl.com/v2/DV90",
+    letsencrypt: "https://acme-v02.api.letsencrypt.org",
+    letsencrypt_test: "https://acme-staging-v02.api.letsencrypt.org/directory"
+  }
+
+  defp provider(), do: Application.get_env(:zerossl, :provider, :zerossl)
+  defp acme_uri(), do: @provider_api[provider()]
+  defp require_external_account_binding(), do: provider() in [:zerossl]
 
   @doc """
   Print a certificate content
@@ -244,7 +249,7 @@ defmodule Acmev2 do
   end
 
   defp get_operations() do
-    {:ok, res} = get(@acme_uri)
+    {:ok, res} = get(acme_uri())
     if res.status_code != 200, do: raise("Cannot get operations")
 
     jdec(res.body)
@@ -293,7 +298,7 @@ defmodule Acmev2 do
     #    "y" => "XLLRQyuhBlY4x3irkxXpW7rlvnN8DMZ1IAHRDq9RJVA"
     #  },
     #  "nonce" => "i086WxMCU7f0EFNoNyeQ0qgqJ3nl0k-pPv_bBqM-R5E",
-    #  "url" => "#{@acme_uri}/newAccount"
+    #  "url" => "#{acme_uri()}/newAccount"
     # }
     # payload
     # %{
@@ -319,7 +324,7 @@ defmodule Acmev2 do
     # %{
     #  "alg" => "HS256",
     #  "kid" => "lpsiTvsUUaX3L3Sfb4PTWQ",
-    #  "url" => "#{@acme_uri}/newAccount"
+    #  "url" => "#{acme_uri()}/newAccount"
     # }
 
     payload =
@@ -329,7 +334,7 @@ defmodule Acmev2 do
       }
 
     payload =
-      case @acme_uri == @letsencrypt do
+      case require_external_account_binding() do
         true ->
           payload
 
@@ -378,8 +383,6 @@ defmodule Acmev2 do
         "signature" => es256sign("#{protected}.#{payload}")
       }
       |> jenc()
-
-    IO.inspect(jws_dec(body))
 
     {:ok, %HTTPoison.Response{body: bin} = new_account_res} =
       post(ops[:newAccount], body, "Content-Type": "application/jose+json")
