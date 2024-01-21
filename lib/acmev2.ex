@@ -28,7 +28,8 @@ defmodule Acmev2 do
 
   @letsencrypt "https://acme-staging-v02.api.letsencrypt.org/directory"
   @zerossl "https://acme.zerossl.com/v2/DV90"
-  @acme_uri @letsencrypt
+  #@acme_uri @letsencrypt
+  @acme_uri @zerossl
 
   @doc """
   Print a certificate content
@@ -143,34 +144,34 @@ defmodule Acmev2 do
     # Equivalent yet short version of the stuff below
     benc(signature)
 
-    # This 100% mimics acme.sh
-    # {:"ECDSA-Sig-Value", r, s} = :public_key.der_decode(:"ECDSA-Sig-Value", signature)
-    #
-    # r = Integer.to_string(r, 16)
-    #
-    # s = Integer.to_string(s, 16)
-    #
-    # r =
-    #  case String.length(r) < 64 do
-    #    true ->
-    #      "0#{r}"
-    #
-    #    false ->
-    #      r
-    #  end
-    #
-    # s =
-    #  case String.length(s) < 64 do
-    #    true ->
-    #      "0#{s}"
-    #
-    #    false ->
-    #      s
-    #  end
-    #
-    # "#{r}#{s}"
-    # |> :binary.decode_hex()
-    # |> benc()
+    # The following part mimics acme.sh. Zerossl doesn't need this "translation",
+    # but apparently letsencrypt does, therefore I'm keeping it for both
+
+    {:"ECDSA-Sig-Value", r, s} = :public_key.der_decode(:"ECDSA-Sig-Value", signature)
+    r = Integer.to_string(r, 16)
+    s = Integer.to_string(s, 16)
+
+    r =
+      case String.length(r) < 64 do
+        true ->
+          "0#{r}"
+
+        false ->
+          r
+      end
+
+    s =
+      case String.length(s) < 64 do
+        true ->
+          "0#{s}"
+
+        false ->
+          s
+      end
+
+    "#{r}#{s}"
+    |> :binary.decode_hex()
+    |> benc()
   end
 
   @doc """
