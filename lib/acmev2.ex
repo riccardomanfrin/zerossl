@@ -407,10 +407,10 @@ defmodule Acmev2 do
     new_nonce = get_nonce_from_resp(new_account_res)
     account_location = get_location_from_resp(new_account_res)
 
-    <<"https://acme-staging-v02.api.letsencrypt.org/acme/acct/", account_key::binary>> =
-      account_location
+    #<<"https://acme-staging-v02.api.letsencrypt.org/acme/acct/", account_key::binary>> =
+    #  account_location |> IO.inspect()
 
-    Application.put_env(:zerossl, :account_key, account_key)
+    #Application.put_env(:zerossl, :account_key, account_key)
 
     {new_nonce, account_location, Jason.decode!(bin, keys: :atoms)}
   end
