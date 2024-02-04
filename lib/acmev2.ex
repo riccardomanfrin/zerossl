@@ -95,7 +95,8 @@ defmodule Acmev2 do
     x = jwk.x |> Base.url_decode64!(padding: false) |> :erlang.binary_to_list()
     y = jwk.y |> Base.url_decode64!(padding: false) |> :erlang.binary_to_list()
 
-    [4 | x ++ y] #|> :erlang.list_to_binary()
+    # |> :erlang.list_to_binary()
+    [4 | x ++ y]
   end
 
   def calcjwk() do
@@ -256,7 +257,7 @@ defmodule Acmev2 do
             HTTPoison.request(method, uri, body, headers, recv_timeout: 10000)
         rescue
           error ->
-            Logger.info("Troubles contacting zerossl: #{inspect(error)}")
+            Logger.info("Troubles contacting ACMEv2 provider: #{inspect(error)}")
             request(uri, method, body, headers, times - 1)
         end
     end
@@ -407,10 +408,10 @@ defmodule Acmev2 do
     new_nonce = get_nonce_from_resp(new_account_res)
     account_location = get_location_from_resp(new_account_res)
 
-    #<<"https://acme-staging-v02.api.letsencrypt.org/acme/acct/", account_key::binary>> =
+    # <<"https://acme-staging-v02.api.letsencrypt.org/acme/acct/", account_key::binary>> =
     #  account_location |> IO.inspect()
 
-    #Application.put_env(:zerossl, :account_key, account_key)
+    # Application.put_env(:zerossl, :account_key, account_key)
 
     {new_nonce, account_location, Jason.decode!(bin, keys: :atoms)}
   end
@@ -491,10 +492,12 @@ defmodule Acmev2 do
     [nonce, resp_body | _rest] = response = apply(fun, [nonce, args])
 
     IO.inspect(resp_body.status, label: STATUS)
+
     case resp_body.status do
       ^awaited ->
         IO.inspect(resp_body.status, label: STATUS)
         response
+
       _ ->
         Logger.debug("Status: processing => Retrying in 5 seconds...")
         Process.sleep(5000)
@@ -629,7 +632,8 @@ defmodule Acmev2 do
       |> jenc()
 
     {:ok, %HTTPoison.Response{body: bin} = finalize_res} =
-      post(finalize_uri, body, "Content-Type": "application/jose+json") |> IO.inspect(label: :finalize_response)
+      post(finalize_uri, body, "Content-Type": "application/jose+json")
+      |> IO.inspect(label: :finalize_response)
 
     new_nonce = get_nonce_from_resp(finalize_res)
     final_order_location_uri = get_location_from_resp(finalize_res)
@@ -690,6 +694,7 @@ defmodule Acmev2 do
     [new_nonce, resp_body]
   end
 
+
   @doc """
   Generate a certificate through Zerossl ACMEv2 APIs on behalf of the user_email,
   for the specified domain.
@@ -712,18 +717,30 @@ defmodule Acmev2 do
   The key and certificate values are in binary encoded format and can be
   directly written on a file
   """
+  @spec gen_cert(domain :: binary()) :: {key :: binary(), cert :: binary()}
+  def gen_cert(domain) do
+    user_email = Application.get_env(:zerossl, :user_email)
+    account_key = Application.get_env(:zerossl, :account_key)
+
+    case user_email do
+      nil -> gen_cert_from_account_key(account_key, domain)
+      _ -> gen_cert_from_email(user_email, domain)
+    end
+  end
+
 
   @spec gen_cert_from_account_key(account_key :: binary(), domain :: binary()) ::
           {key :: binary(), cert :: binary()}
-  def gen_cert_from_account_key(account_key, domain) do
+  defp gen_cert_from_account_key(account_key, domain) do
     Logger.debug("Get EAB credentials")
+
     get_eab_credentials(account_key)
     |> gen_cert(domain)
   end
 
   @spec gen_cert_from_email(user_email :: binary(), domain :: binary()) ::
           {key :: binary(), cert :: binary()}
-  def gen_cert_from_email(user_email, domain) do
+  defp gen_cert_from_email(user_email, domain) do
     Logger.debug("Get EAB credentials")
 
     get_eab_credentials_byemail(user_email)
@@ -758,6 +775,7 @@ defmodule Acmev2 do
     [nonce, %{token: ^token}] = post_chall(nonce, [account_location, chall_uri])
 
     Logger.debug("Checking challenge http.1 validity")
+
     [nonce, %{token: ^token}] =
       processing_state_retry(&post_chall/2, nonce, [account_location, chall_uri], "valid")
 
@@ -767,17 +785,27 @@ defmodule Acmev2 do
     {cert_priv_key, csr} = gen_csr(domain)
 
     [nonce, _body, final_order_location_uri] =
-      processing_state_retry(&post_finalize/2, nonce, [csr, new_order_res.finalize, account_location], "processing")
+      processing_state_retry(
+        &post_finalize/2,
+        nonce,
+        [csr, new_order_res.finalize, account_location],
+        "processing"
+      )
 
     Process.sleep(15)
 
     Logger.debug("Get final certificate URL")
 
     [nonce, response] =
-      processing_state_retry(&post_final_order/2, nonce, [
-        final_order_location_uri,
-        account_location
-      ], "valid")
+      processing_state_retry(
+        &post_final_order/2,
+        nonce,
+        [
+          final_order_location_uri,
+          account_location
+        ],
+        "valid"
+      )
 
     Logger.debug("Getting certificate")
 
