@@ -281,7 +281,7 @@ defmodule Acmev2 do
   end
 
   defp get_location_from_resp(res) do
-    {_, location} = List.keyfind!(res.headers, "Location", 0)
+    {_, location} = List.keyfind(res.headers, "Location", 0, {:error, nil})
     location
   end
 
