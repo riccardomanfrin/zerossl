@@ -487,17 +487,18 @@ defmodule Acmev2 do
     {new_nonce, chall_uri, token}
   end
 
-  defp processing_state_retry(fun, nonce, args) do
-    {nonce, resp_body} = apply(fun, [nonce, args])
+  defp processing_state_retry(fun, nonce, args, awaited) do
+    [nonce, resp_body | _rest] = response = apply(fun, [nonce, args])
 
+    IO.inspect(resp_body.status, label: STATUS)
     case resp_body.status do
-      "processing" ->
+      ^awaited ->
+        IO.inspect(resp_body.status, label: STATUS)
+        response
+      _ ->
         Logger.debug("Status: processing => Retrying in 5 seconds...")
         Process.sleep(5000)
-        processing_state_retry(fun, nonce, args)
-
-      _ ->
-        {nonce, resp_body}
+        processing_state_retry(fun, nonce, args, awaited)
     end
   end
 
@@ -527,7 +528,7 @@ defmodule Acmev2 do
     new_nonce = get_nonce_from_resp(chall_res)
     resp_body = Jason.decode!(bin, keys: :atoms)
 
-    {new_nonce, resp_body}
+    [new_nonce, resp_body]
   end
 
   defp gen_key_authorization(token) do
@@ -607,7 +608,7 @@ defmodule Acmev2 do
     {X509.PrivateKey.to_pem(key), csr}
   end
 
-  defp post_finalize(nonce, csr, finalize_uri, account_location) do
+  defp post_finalize(nonce, [csr, finalize_uri, account_location]) do
     payload = %{csr: csr} |> enc()
 
     protected =
@@ -628,11 +629,11 @@ defmodule Acmev2 do
       |> jenc()
 
     {:ok, %HTTPoison.Response{body: bin} = finalize_res} =
-      post(finalize_uri, body, "Content-Type": "application/jose+json")
+      post(finalize_uri, body, "Content-Type": "application/jose+json") |> IO.inspect(label: :finalize_response)
 
     new_nonce = get_nonce_from_resp(finalize_res)
     final_order_location_uri = get_location_from_resp(finalize_res)
-    {new_nonce, final_order_location_uri, Jason.decode!(bin, keys: :atoms)}
+    [new_nonce, Jason.decode!(bin, keys: :atoms), final_order_location_uri]
   end
 
   defp get_final_cert(nonce, certificate_uri, account_location) do
@@ -686,7 +687,7 @@ defmodule Acmev2 do
 
     new_nonce = get_nonce_from_resp(final_order_res)
     resp_body = Jason.decode!(bin, keys: :atoms)
-    {new_nonce, resp_body}
+    [new_nonce, resp_body]
   end
 
   @doc """
@@ -716,7 +717,6 @@ defmodule Acmev2 do
           {key :: binary(), cert :: binary()}
   def gen_cert_from_account_key(account_key, domain) do
     Logger.debug("Get EAB credentials")
-
     get_eab_credentials(account_key)
     |> gen_cert(domain)
   end
@@ -754,28 +754,30 @@ defmodule Acmev2 do
     Logger.debug("Serving well known challenge token")
     pid = serve(token)
 
-    Logger.debug("Challenge http.1")
+    Logger.debug("Asking to challenge http.1")
+    [nonce, %{token: ^token}] = post_chall(nonce, [account_location, chall_uri])
 
-    {nonce, %{token: ^token}} =
-      processing_state_retry(&post_chall/2, nonce, [account_location, chall_uri])
+    Logger.debug("Checking challenge http.1 validity")
+    [nonce, %{token: ^token}] =
+      processing_state_retry(&post_chall/2, nonce, [account_location, chall_uri], "valid")
 
     Logger.debug("Challenge http.1 checking valid")
 
     Logger.debug("Finalizing order")
     {cert_priv_key, csr} = gen_csr(domain)
 
-    {nonce, final_order_location_uri, _body} =
-      post_finalize(nonce, csr, new_order_res.finalize, account_location)
+    [nonce, _body, final_order_location_uri] =
+      processing_state_retry(&post_finalize/2, nonce, [csr, new_order_res.finalize, account_location], "ready")
 
     Process.sleep(15)
 
     Logger.debug("Get final certificate URL")
 
-    {nonce, response} =
+    [nonce, response] =
       processing_state_retry(&post_final_order/2, nonce, [
         final_order_location_uri,
         account_location
-      ])
+      ], "ready")
 
     Logger.debug("Getting certificate")
 
