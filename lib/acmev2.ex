@@ -491,12 +491,12 @@ defmodule Acmev2 do
   defp processing_state_retry(fun, nonce, args, awaited) do
     [nonce, resp_body | _rest] = response = apply(fun, [nonce, args])
 
-    case resp_body.status do
-      ^awaited ->
+    case resp_body.status in awaited do
+      true ->
         response
 
       _ ->
-        Logger.debug("Status: processing => Retrying in 5 seconds...")
+        Logger.debug("Operation status: #{resp_body.status} => Retrying in 5 seconds...")
         Process.sleep(5000)
         processing_state_retry(fun, nonce, args, awaited)
     end
@@ -787,7 +787,7 @@ defmodule Acmev2 do
     Logger.debug("Checking challenge http.1 validity")
 
     [nonce, %{token: ^token}] =
-      processing_state_retry(&post_chall/2, nonce, [account_location, chall_uri], "valid")
+      processing_state_retry(&post_chall/2, nonce, [account_location, chall_uri], ["valid"])
 
     Logger.debug("Challenge http.1 checking valid")
 
@@ -799,7 +799,7 @@ defmodule Acmev2 do
         &post_finalize/2,
         nonce,
         [csr, new_order_res.finalize, account_location],
-        "valid"
+        ["processing", "valid"]
       )
 
     Process.sleep(15)
@@ -814,7 +814,7 @@ defmodule Acmev2 do
           final_order_location_uri,
           account_location
         ],
-        "valid"
+        ["valid"]
       )
 
     Logger.debug("Getting certificate")
