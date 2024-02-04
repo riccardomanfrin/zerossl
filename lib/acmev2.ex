@@ -85,7 +85,7 @@ defmodule Acmev2 do
   defp jenc(data), do: Jason.encode!(data)
 
   def storejwk() do
-    jwk =%{
+    jwk = %{
       crv: "P-256",
       kty: "EC",
       x: "ySlCCMfgj6mdqZxH9y4lMmWaxYezHK74pYXsAdo5Iv0",
@@ -103,13 +103,13 @@ defmodule Acmev2 do
 
     ecdsa_key(publicKey: publicKey) =
       hd(:public_key.pem_decode(eckey))
-      |> :public_key.pem_entry_decode()|> IO.inspect(label: :xy)
+      |> :public_key.pem_entry_decode()
 
     [_h | xy] =
       publicKey
       |> :erlang.binary_to_list()
 
-    [x, y] = xy  |> Enum.chunk_every(32)
+    [x, y] = xy |> Enum.chunk_every(32)
 
     %{
       "crv" => "P-256",
@@ -404,7 +404,6 @@ defmodule Acmev2 do
     if new_account_res.status_code != 200 and new_account_res.status_code != 201,
       do: raise("Cannot generate new_account: #{inspect(new_account_res)}")
 
-    IO.inspect new_account_res
     new_nonce = get_nonce_from_resp(new_account_res)
     account_location = get_location_from_resp(new_account_res)
 
@@ -413,11 +412,7 @@ defmodule Acmev2 do
     {new_nonce, account_location, Jason.decode!(bin, keys: :atoms)}
   end
 
-  defp post_new_order(ops, domain, account_location, nonce, %{
-         success: true,
-         eab_kid: _eab_kid,
-         eab_hmac_key: _eab_hmac_key
-       }) do
+  defp post_new_order(ops, domain, account_location, nonce) do
     protected =
       %{
         nonce: nonce,
@@ -748,7 +743,7 @@ defmodule Acmev2 do
     {nonce, account_location, _new_account_res} = post_new_account(ops, nonce, eab_credentials)
 
     Logger.debug("Get new order")
-    {nonce, new_order_res} = post_new_order(ops, domain, account_location, nonce, eab_credentials)
+    {nonce, new_order_res} = post_new_order(ops, domain, account_location, nonce)
 
     Logger.debug("Get challanges (authz)")
     {nonce, chall_uri, token} = post_authz(account_location, nonce, new_order_res.authorizations)
