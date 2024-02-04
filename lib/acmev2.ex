@@ -28,7 +28,7 @@ defmodule Acmev2 do
 
   @provider_api %{
     zerossl: "https://acme.zerossl.com/v2/DV90",
-    letsencrypt: "https://acme-v02.api.letsencrypt.org",
+    letsencrypt: "https://acme-v02.api.letsencrypt.org/directory",
     letsencrypt_test: "https://acme-staging-v02.api.letsencrypt.org/directory"
   }
 
@@ -205,7 +205,7 @@ defmodule Acmev2 do
         jdec(bin)
 
       _ ->
-        {:ok, %HTTPoison.Response{body: bin}} =
+        {:ok, %HTTPoison.Response{body: bin, status_code: 200}} =
           post(
             "https://api.zerossl.com/acme/eab-credentials?access_key=#{account_key}",
             "",
@@ -491,11 +491,8 @@ defmodule Acmev2 do
   defp processing_state_retry(fun, nonce, args, awaited) do
     [nonce, resp_body | _rest] = response = apply(fun, [nonce, args])
 
-    IO.inspect(resp_body.status, label: STATUS)
-
     case resp_body.status do
       ^awaited ->
-        IO.inspect(resp_body.status, label: STATUS)
         response
 
       _ ->
@@ -633,7 +630,6 @@ defmodule Acmev2 do
 
     {:ok, %HTTPoison.Response{body: bin} = finalize_res} =
       post(finalize_uri, body, "Content-Type": "application/jose+json")
-      |> IO.inspect(label: :finalize_response)
 
     new_nonce = get_nonce_from_resp(finalize_res)
     final_order_location_uri = get_location_from_resp(finalize_res)
@@ -694,7 +690,6 @@ defmodule Acmev2 do
     [new_nonce, resp_body]
   end
 
-
   @doc """
   Generates a certificate through ACMEv2 protocol for the specified domain.
 
@@ -743,7 +738,6 @@ defmodule Acmev2 do
       _ -> gen_cert_from_email(user_email, domain)
     end
   end
-
 
   @spec gen_cert_from_account_key(account_key :: binary(), domain :: binary()) ::
           {key :: binary(), cert :: binary()}
@@ -805,7 +799,7 @@ defmodule Acmev2 do
         &post_finalize/2,
         nonce,
         [csr, new_order_res.finalize, account_location],
-        "processing"
+        "valid"
       )
 
     Process.sleep(15)
