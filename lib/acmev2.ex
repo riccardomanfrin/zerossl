@@ -84,18 +84,32 @@ defmodule Acmev2 do
   defp benc(data), do: Base.url_encode64(data, padding: false)
   defp jenc(data), do: Jason.encode!(data)
 
-  defp calcjwk() do
+  def storejwk() do
+    jwk =%{
+      crv: "P-256",
+      kty: "EC",
+      x: "ySlCCMfgj6mdqZxH9y4lMmWaxYezHK74pYXsAdo5Iv0",
+      y: "KlafnvxiFW_3-zoTG1FQlrQeeYrnNXSNGCkYF-8jzyM"
+    }
+
+    x = jwk.x |> Base.url_decode64!(padding: false) |> :erlang.binary_to_list()
+    y = jwk.y |> Base.url_decode64!(padding: false) |> :erlang.binary_to_list()
+
+    [4 | x ++ y] #|> :erlang.list_to_binary()
+  end
+
+  def calcjwk() do
     {:ok, eckey} = :file.read_file("ec.key")
 
     ecdsa_key(publicKey: publicKey) =
       hd(:public_key.pem_decode(eckey))
-      |> :public_key.pem_entry_decode()
+      |> :public_key.pem_entry_decode()|> IO.inspect(label: :xy)
 
     [_h | xy] =
       publicKey
       |> :erlang.binary_to_list()
 
-    [x, y] = xy |> Enum.chunk_every(32)
+    [x, y] = xy  |> Enum.chunk_every(32)
 
     %{
       "crv" => "P-256",
@@ -390,8 +404,12 @@ defmodule Acmev2 do
     if new_account_res.status_code != 200 and new_account_res.status_code != 201,
       do: raise("Cannot generate new_account: #{inspect(new_account_res)}")
 
+    IO.inspect new_account_res
     new_nonce = get_nonce_from_resp(new_account_res)
     account_location = get_location_from_resp(new_account_res)
+
+
+
     {new_nonce, account_location, Jason.decode!(bin, keys: :atoms)}
   end
 
