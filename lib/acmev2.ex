@@ -696,8 +696,24 @@ defmodule Acmev2 do
 
 
   @doc """
-  Generate a certificate through Zerossl ACMEv2 APIs on behalf of the user_email,
-  for the specified domain.
+  Generates a certificate through ACMEv2 protocol for the specified domain.
+
+  The following ACMEv2 providers are supported
+
+  - `:zerossl` [*]
+  - `:letsencrypt`
+  - `:letsencrypt_test`
+
+  Zerossl requires EAB (External Account Binding) prior to issue a certificate:
+  you will have to register with a proper email to it. Once you've
+  created an account, you can either provide the email or the account key (I've
+  seen it called "access key" or "API key" around) in the configuration.
+  The code tries to lookup for the email, and when not found, defaults
+  to the `:account_key`. You can find your account key (called API key in zerossl)
+  here:
+
+      https://app.zerossl.com/developer
+
 
   To perform the authentication the EAB credentails must be retrieved.
   These are saved on a file `eab_credentials.json` to be reused
