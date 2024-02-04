@@ -767,7 +767,7 @@ defmodule Acmev2 do
     {cert_priv_key, csr} = gen_csr(domain)
 
     [nonce, _body, final_order_location_uri] =
-      processing_state_retry(&post_finalize/2, nonce, [csr, new_order_res.finalize, account_location], "ready")
+      processing_state_retry(&post_finalize/2, nonce, [csr, new_order_res.finalize, account_location], "processing")
 
     Process.sleep(15)
 
@@ -777,7 +777,7 @@ defmodule Acmev2 do
       processing_state_retry(&post_final_order/2, nonce, [
         final_order_location_uri,
         account_location
-      ], "ready")
+      ], "valid")
 
     Logger.debug("Getting certificate")
 
