@@ -511,7 +511,7 @@ defmodule Acmev2 do
       }
       |> enc()
 
-    payload = "{}" |> enc()
+    payload = "{}" |> benc()
 
     body =
       %{
