@@ -185,11 +185,11 @@ defmodule Acmev2 do
   end
 
   @doc """
-  Retrieve EAB credentials from access key instead than from email credentials
+  Retrieve EAB credentials from account key instead than from email credentials
   """
-  @spec get_eab_credentials(account_key :: binary()) ::
+  @spec get_eab_credentials_from_account_key(account_key :: binary()) ::
           {binary(), term() | no_return()}
-  defp get_eab_credentials(account_key) do
+  defp get_eab_credentials_from_account_key(account_key) do
     case File.read("eab_credentials.json") do
       {:ok, bin} ->
         jdec(bin)
@@ -215,7 +215,7 @@ defmodule Acmev2 do
     # }}
   end
 
-  defp get_eab_credentials_byemail(email) do
+  defp get_eab_credentials_from_email(email) do
     case File.read("eab_credentials.json") do
       {:ok, bin} ->
         jdec(bin)
@@ -734,7 +734,7 @@ defmodule Acmev2 do
   defp gen_cert_from_account_key(account_key, domain) do
     Logger.debug("Get EAB credentials")
 
-    get_eab_credentials(account_key)
+    get_eab_credentials_from_account_key(account_key)
     |> gen_cert(domain)
   end
 
@@ -743,7 +743,7 @@ defmodule Acmev2 do
   defp gen_cert_from_email(user_email, domain) do
     Logger.debug("Get EAB credentials")
 
-    get_eab_credentials_byemail(user_email)
+    get_eab_credentials_from_email(user_email)
     |> gen_cert(domain)
   end
 
