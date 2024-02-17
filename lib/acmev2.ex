@@ -84,22 +84,7 @@ defmodule Acmev2 do
   defp benc(data), do: Base.url_encode64(data, padding: false)
   defp jenc(data), do: Jason.encode!(data)
 
-  def storejwk() do
-    jwk = %{
-      crv: "P-256",
-      kty: "EC",
-      x: "ySlCCMfgj6mdqZxH9y4lMmWaxYezHK74pYXsAdo5Iv0",
-      y: "KlafnvxiFW_3-zoTG1FQlrQeeYrnNXSNGCkYF-8jzyM"
-    }
-
-    x = jwk.x |> Base.url_decode64!(padding: false) |> :erlang.binary_to_list()
-    y = jwk.y |> Base.url_decode64!(padding: false) |> :erlang.binary_to_list()
-
-    # |> :erlang.list_to_binary()
-    [4 | x ++ y]
-  end
-
-  def calcjwk() do
+  defp calcjwk() do
     {:ok, eckey} = :file.read_file("ec.key")
 
     ecdsa_key(publicKey: publicKey) =
@@ -120,15 +105,11 @@ defmodule Acmev2 do
     }
   end
 
-  @doc """
-  Create a generic Elliptic Curve key to use as Account Key in the ACMEv2 protocol
-
-  This key is associated with the user account and can be used multiple times.
-
-  In general the key can be used for revoking of the certificate and other operations.
-
-  """
-  def create_domain_ec_key() do
+  defp create_domain_ec_key() do
+    # Create a generic Elliptic Curve key to use as Account Key in the ACMEv2 protocol
+    # This key is associated with the user account and can be used multiple times.
+    # In general the key can be used for revoking of the certificate and other operations.
+    #
     # {pubkey, privkey} = :crypto.generate_key(:ecdh, :prime256v1)
     # Credits:
     # https://github.com/voltone/x509/blob/48833e38f36fa817b0988bfb2f4ead07f233c3e4/lib/x509/private_key.ex#L63
@@ -184,26 +165,51 @@ defmodule Acmev2 do
     |> benc()
   end
 
-  @doc """
-  Retrieve EAB credentials from account key instead than from email credentials
-  """
-  @spec get_eab_credentials_from_account_key(account_key :: binary()) ::
-          {binary(), term() | no_return()}
-  defp get_eab_credentials_from_account_key(account_key) do
-    case File.read("eab_credentials.json") do
-      {:ok, bin} ->
-        jdec(bin)
+  defp try_load_eab_from_file() do
+    with {:ok, bin} <- File.read("eab_credentials.json"),
+         %{success: true} = eab_credentials <- jdec(bin) do
+      eab_credentials
+    else
+      _ -> nil
+    end
+  end
 
-      _ ->
-        {:ok, %HTTPoison.Response{body: bin, status_code: 200}} =
-          post(
-            "https://api.zerossl.com/acme/eab-credentials?access_key=#{account_key}",
-            "",
-            []
-          )
+  defp store_eab_to_file_and_dec(bin) do
+    File.write("eab_credentials.json", bin)
+    jdec(bin)
+  end
 
-        File.write("eab_credentials.json", bin)
-        jdec(bin)
+  @spec get_eab_credentials({:user_email | :account_key, account_key :: binary()}) ::
+          map()
+  defp get_eab_credentials({user_id_type, user_id}) do
+    case try_load_eab_from_file() do
+      nil ->
+        Logger.debug("Deriving EAB credentials from #{user_id_type}")
+
+        case user_id_type do
+          :account_key ->
+            {:ok, %HTTPoison.Response{body: bin, status_code: 200}} =
+              post(
+                "https://api.zerossl.com/acme/eab-credentials?access_key=#{user_id}",
+                "",
+                []
+              )
+
+            store_eab_to_file_and_dec(bin)
+
+          :user_email ->
+            {:ok, %HTTPoison.Response{body: bin, status_code: 200}} =
+              post(
+                "https://api.zerossl.com/acme/eab-credentials-email",
+                "email=#{user_id}",
+                [{"content-type", "application/x-www-form-urlencoded"}]
+              )
+
+            store_eab_to_file_and_dec(bin)
+        end
+
+      eab_credentials ->
+        eab_credentials
     end
 
     # {nonce,
@@ -213,24 +219,6 @@ defmodule Acmev2 do
     #  eab_kid: "taHRbdCH-vXZoUw6eo1Qwg",
     #  eab_hmac_key: "PU8DmBne_woTwhm5677xx8bvD0LILGfFJ9eJiCQT_jDSrCDQOpam6DGGY8XS-AkurBEHEQyVY9FzIkBgqF9TOg"
     # }}
-  end
-
-  defp get_eab_credentials_from_email(email) do
-    case File.read("eab_credentials.json") do
-      {:ok, bin} ->
-        jdec(bin)
-
-      _ ->
-        {:ok, %HTTPoison.Response{body: bin}} =
-          post(
-            "https://api.zerossl.com/acme/eab-credentials-email",
-            "email=#{email}",
-            [{"content-type", "application/x-www-form-urlencoded"}]
-          )
-
-        File.write("eab_credentials.json", bin)
-        jdec(bin)
-    end
   end
 
   defp get(uri), do: request(:get, uri)
@@ -339,11 +327,11 @@ defmodule Acmev2 do
       }
 
     payload =
-      case require_external_account_binding() do
-        true ->
+      case eab_credentials do
+        nil ->
           payload
 
-        false ->
+        _ ->
           payload_payload =
             calcjwk()
             |> enc()
@@ -720,34 +708,31 @@ defmodule Acmev2 do
   """
   @spec gen_cert(domain :: binary()) :: {key :: binary(), cert :: binary()}
   def gen_cert(domain) do
-    user_email = Application.get_env(:zerossl, :user_email)
-    account_key = Application.get_env(:zerossl, :account_key)
+    eab_credentials =
+      with {:eab_required, true} <- {:eab_required, require_external_account_binding()},
+           {:user_email, user_email} <- {:user_email, Application.get_env(:zerossl, :user_email)},
+           {:user_email, nil} <- {:user_email, user_email},
+           {:account_key, account_key} <-
+             {:account_key, Application.get_env(:zerossl, :account_key)},
+           {:account_key, nil} <- {:account_key, account_key} do
+        raise(
+          "Cannot retrieve External Account Binding (EAB) Credentials without :user_email or :account_key conf"
+        )
+      else
+        {:eab_required, false} ->
+          nil
 
-    case user_email do
-      nil -> gen_cert_from_account_key(account_key, domain)
-      _ -> gen_cert_from_email(user_email, domain)
-    end
+        {:user_email, _user_email} = user ->
+          get_eab_credentials(user)
+
+        {:account_key, _account_key} = user ->
+          get_eab_credentials(user)
+      end
+
+    do_gen_cert(domain, eab_credentials)
   end
 
-  @spec gen_cert_from_account_key(account_key :: binary(), domain :: binary()) ::
-          {key :: binary(), cert :: binary()}
-  defp gen_cert_from_account_key(account_key, domain) do
-    Logger.debug("Get EAB credentials")
-
-    get_eab_credentials_from_account_key(account_key)
-    |> gen_cert(domain)
-  end
-
-  @spec gen_cert_from_email(user_email :: binary(), domain :: binary()) ::
-          {key :: binary(), cert :: binary()}
-  defp gen_cert_from_email(user_email, domain) do
-    Logger.debug("Get EAB credentials")
-
-    get_eab_credentials_from_email(user_email)
-    |> gen_cert(domain)
-  end
-
-  defp gen_cert(eab_credentials, domain) do
+  defp do_gen_cert(domain, eab_credentials) do
     Logger.debug("Generating cert for domain #{domain}")
 
     Logger.debug("Get operations")

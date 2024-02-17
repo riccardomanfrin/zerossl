@@ -116,7 +116,7 @@ defmodule Certmgr do
       case Application.get_env(:zerossl, :selfsigned, false) do
         true -> Selfsigned.gen_cert(domain)
         false -> Acmev2.gen_cert(domain)
-        end
+      end
 
     write_cert(cert_priv_key, public_cert)
     notify_update_handler(cert_priv_key, public_cert)
