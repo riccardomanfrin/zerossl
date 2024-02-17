@@ -168,26 +168,16 @@ defmodule Acmev2 do
     # but apparently letsencrypt does, therefore I'm keeping it for both
 
     {:"ECDSA-Sig-Value", r, s} = :public_key.der_decode(:"ECDSA-Sig-Value", signature)
-    r = Integer.to_string(r, 16)
-    s = Integer.to_string(s, 16)
 
     r =
-      case String.length(r) < 64 do
-        true ->
-          "0#{r}"
-
-        false ->
-          r
-      end
+      r
+      |> Integer.to_string(16)
+      |> String.pad_leading(64, "0")
 
     s =
-      case String.length(s) < 64 do
-        true ->
-          "0#{s}"
-
-        false ->
-          s
-      end
+      s
+      |> Integer.to_string(16)
+      |> String.pad_leading(64, "0")
 
     "#{r}#{s}"
     |> :binary.decode_hex()
