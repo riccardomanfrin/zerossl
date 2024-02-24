@@ -24,7 +24,7 @@ In your `config.exs` or `prod.exs` add the following config:
 
 ```elixir
 config  :zerossl,
-  provider: :letsencrypt
+  provider: :letsencrypt,
   cert_domain:  "myfancy-domain.com",
   certfile:  "./cert.pem",
   keyfile:  "./key.pem"
