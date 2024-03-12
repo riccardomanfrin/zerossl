@@ -320,9 +320,14 @@ defmodule Acmev2 do
     #  "url" => "#{acme_uri()}/newAccount"
     # }
 
+    contact = case Application.get_env(:zerossl, :user_email) do
+      nil -> []
+      email -> ["mailto:#{email}"]
+    end
+
     payload =
       %{
-        "contact" => ["mailto:riccardomanfrin@gmail.com"],
+        "contact" => contact,
         "termsOfServiceAgreed" => true
       }
 
