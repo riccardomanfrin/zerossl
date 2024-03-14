@@ -35,6 +35,7 @@ defmodule Acmev2 do
   defp provider(), do: Application.get_env(:zerossl, :provider, :zerossl)
   defp acme_uri(), do: @provider_api[provider()]
   defp require_external_account_binding(), do: provider() in [:zerossl]
+  defp storage_module(), do: Application.get_env(:zerossl, :storage_module, File)
 
   @doc """
   Print a certificate content
@@ -85,7 +86,7 @@ defmodule Acmev2 do
   defp jenc(data), do: Jason.encode!(data)
 
   defp calcjwk() do
-    {:ok, eckey} = :file.read_file("ec.key")
+    {:ok, eckey} = storage_module().read("ec.key")
 
     ecdsa_key(publicKey: publicKey) =
       hd(:public_key.pem_decode(eckey))
@@ -121,7 +122,7 @@ defmodule Acmev2 do
     # refer to [RFC4492 appendix A](https://www.rfc-editor.org/rfc/rfc4492.html#appendix-A)
     # for a mapping table."
 
-    case File.exists?("ec.key") do
+    case storage_module().exists?("ec.key") do
       true ->
         :ok
 
@@ -129,12 +130,12 @@ defmodule Acmev2 do
         key = :public_key.generate_key({:namedCurve, :secp256r1})
         pem_entry = :public_key.pem_entry_encode(:ECPrivateKey, key)
         domain_ec_key = :public_key.pem_encode([pem_entry])
-        :file.write_file("ec.key", domain_ec_key)
+        storage_module().write("ec.key", domain_ec_key)
     end
   end
 
   defp es256sign(payload) do
-    {:ok, eckey} = :file.read_file("ec.key")
+    {:ok, eckey} = storage_module().read("ec.key")
 
     eckey =
       hd(:public_key.pem_decode(eckey))
@@ -166,7 +167,7 @@ defmodule Acmev2 do
   end
 
   defp try_load_eab_from_file() do
-    with {:ok, bin} <- File.read("eab_credentials.json"),
+    with {:ok, bin} <- storage_module().read("eab_credentials.json"),
          %{success: true} = eab_credentials <- jdec(bin) do
       eab_credentials
     else
@@ -175,7 +176,7 @@ defmodule Acmev2 do
   end
 
   defp store_eab_to_file_and_dec(bin) do
-    File.write("eab_credentials.json", bin)
+    storage_module().write("eab_credentials.json", bin)
     jdec(bin)
   end
 
