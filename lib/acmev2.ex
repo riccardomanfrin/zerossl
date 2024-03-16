@@ -321,10 +321,11 @@ defmodule Acmev2 do
     #  "url" => "#{acme_uri()}/newAccount"
     # }
 
-    contact = case Application.get_env(:zerossl, :user_email) do
-      nil -> []
-      email -> ["mailto:#{email}"]
-    end
+    contact =
+      case Application.get_env(:zerossl, :user_email) do
+        nil -> []
+        email -> ["mailto:#{email}"]
+      end
 
     payload =
       %{
@@ -536,10 +537,13 @@ defmodule Acmev2 do
       |> String.to_charlist()
       |> :inet.parse_address()
 
+    ipfamily = if tuple_size(bind_address) == 4, do: :inet, else: :inet6
+
     {:ok, pid} =
       :inets.start(:httpd,
         port: port,
         bind_address: bind_address,
+        ipfamily: ipfamily,
         server_name: ~c"httpd_test",
         server_root: ~c"./",
         document_root: ~c"./"
