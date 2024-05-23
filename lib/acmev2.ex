@@ -772,7 +772,7 @@ defmodule Acmev2 do
     Logger.debug("Checking challenge http.1 validity")
 
     [nonce, %{token: ^token}] =
-      processing_state_retry(&post_chall/2, nonce, [account_location, chall_uri], ["valid"])
+      processing_state_retry(&post_chall/2, nonce, [account_location, chall_uri], ["pending", "valid"])
 
     Logger.debug("Challenge http.1 checking valid")
 
