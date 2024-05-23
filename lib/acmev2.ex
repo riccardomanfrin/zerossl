@@ -481,7 +481,7 @@ defmodule Acmev2 do
         response
 
       _ ->
-        Logger.debug("Operation status: #{resp_body.status} => Retrying in 5 seconds...")
+        Logger.debug("Operation status: #{resp_body.status} (#{inspect resp_body}) => Retrying in 5 seconds...")
         Process.sleep(5000)
         processing_state_retry(fun, nonce, args, awaited)
     end
