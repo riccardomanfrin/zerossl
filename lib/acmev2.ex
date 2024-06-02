@@ -526,7 +526,8 @@ defmodule Acmev2 do
   end
 
   defp serve(token) do
-    path = ".well-known/acme-challenge/#{token}"
+    base = Path.join(System.tmp_dir!(), "zerossl_httpd")
+    path = Path.join(base, ".well-known/acme-challenge/#{token}")
     File.mkdir_p!(Path.dirname(path))
     File.write(path, gen_key_authorization(token))
 
@@ -544,9 +545,9 @@ defmodule Acmev2 do
         port: port,
         bind_address: bind_address,
         ipfamily: ipfamily,
-        server_name: ~c"httpd_test",
+        server_name: ~c"http_challenge",
         server_root: ~c"./",
-        document_root: ~c"./"
+        document_root: String.to_charlist(base)
       )
 
     pid
