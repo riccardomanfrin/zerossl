@@ -541,13 +541,17 @@ defmodule Acmev2 do
     ipfamily = if tuple_size(bind_address) == 4, do: :inet, else: :inet6
 
     {:ok, pid} =
-      :inets.start(:httpd,
-        port: port,
-        bind_address: bind_address,
-        ipfamily: ipfamily,
-        server_name: ~c"http_challenge",
-        server_root: ~c"./",
-        document_root: String.to_charlist(base)
+      :inets.start(
+        :httpd,
+        [
+          port: port,
+          bind_address: bind_address,
+          ipfamily: ipfamily,
+          server_name: ~c"http_challenge",
+          server_root: ~c"./",
+          document_root: String.to_charlist(base)
+        ],
+        :stand_alone
       )
 
     pid
