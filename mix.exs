@@ -17,7 +17,8 @@ defmodule Zerossl.MixProject do
         main: "readme",
         # logo: "path/to/logo.png",
         extras: ["README.md"]
-      ]
+      ],
+      package: package()
     ]
   end
 
@@ -47,6 +48,14 @@ defmodule Zerossl.MixProject do
       # Non prod
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+    ]
+  end
+  defp package() do
+    [
+      name: "zerossl",
+      licenses: ["MIT"],
+      description: "Provides zerossl and letsencrypt (and letsencrypt-testing) SSL certs management automation",
+      links: %{"GitHub" => "https://github.com/riccardomanfrin/zerossl"}
     ]
   end
 end
