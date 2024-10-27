@@ -13,7 +13,7 @@ to your list of dependencies in `mix.exs`:
 ```elixir
 def  deps  do
 [
-  {:zerossl, "~> 1.0.0"}
+  {:zerossl, "~> 1.1.1"}
 ]
 end
 ```
