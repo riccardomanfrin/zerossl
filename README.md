@@ -1,5 +1,5 @@
 
-# Zerossl client library
+# Zerossl / Letsencrypt client library with autorenewal management
 
 Zerossl is a Elixir library to automatically manage and refresh your Zerossl and Letsencrypt certificates natively, without the need for extra applications like [acme.sh](https://github.com/acmesh-official/acme.sh)  bash script or [certbot](https://certbot.eff.org/) clients.
 The client implements the [ACME(v2) rfc8555](https://datatracker.ietf.org/doc/html/rfc8555) `http-01` challenge auth mechanism to issue and refresh a genuine certificate against [Zerossl](https://zerossl.com/)
