@@ -4,7 +4,7 @@ defmodule Zerossl.MixProject do
   def project do
     [
       app: :zerossl,
-      version: "1.1.1",
+      version: "1.1.2",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -43,7 +43,7 @@ defmodule Zerossl.MixProject do
     [
       {:httpoison, "~> 2.0"},
       {:jason, "~> 1.4"},
-      {:x509, "~> 0.8"},
+      {:x509, "~> 0.9"},
 
       # Non prod
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
